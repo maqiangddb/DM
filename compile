@@ -1,1 +1,2 @@
 ant clean debug install
+adb logcat -s DM

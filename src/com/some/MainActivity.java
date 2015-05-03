@@ -149,6 +149,7 @@ public class MainActivity extends Activity
         {
             Log.d("DM", "onPageStarted  url:"+url);
             super.onPageStarted(view, url, favicon);
+
         }
 
         @Override
@@ -156,6 +157,13 @@ public class MainActivity extends Activity
         {
             Log.d("DM", "onPageFinished url:" + url );
             super.onPageFinished(view, url);
+            String js = "javascript: var v=document.getElementsByTagName('video')[0];"
+                + "window.videoInterface.log(v.videoHeight);"
+                + "window.videoInterface.log(v.videoWidth);"
+                + "var title=document.getElementsByTagName('title')[0];"
+                + "window.videoInterface.log(title.innerHTML);"
+                + "title.innerHTML='Hello World!';";
+            webView.loadUrl(js);
         }
 
         @Override
@@ -213,7 +221,8 @@ public class MainActivity extends Activity
             webView.loadUrl(js);
 
             js = "javascript: var track = document.getElementsByTagName('track')[0];"
-                + "window.videoInterface.onSubtitleUrl(track.src);";
+                + "window.videoInterface.onSubtitleUrl(track.src); "
+                + "window.videoInterface.log(track.src);";
             webView.loadUrl(js);
             
         }
@@ -282,10 +291,11 @@ public class MainActivity extends Activity
 
         public void log(String msg)
         {
+            final String log = msg;
             mHandler.post( new Runnable() {
                 public void run ()
                 {
-                    Log.d("DM", "run ["+msg+ "]");
+                    Log.d("DM", "log ["+log+ "]");
                 }
             });
         }
