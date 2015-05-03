@@ -13,7 +13,19 @@ import android.view.KeyEvent;
 import android.view.ViewGroup;
 import android.webkit.WebResourceResponse;
 import android.widget.FrameLayout;
+import android.widget.VideoView;
 import android.os.Handler;
+import android.content.Context;
+import android.graphics.Bitmap;
+
+//import android.media.MediaFormat;
+//import com.android.org.chromium.content.browser.ContentVideoView;
+
+import java.io.InputStream;
+import java.io.IOException;
+import java.net.URL;
+import java.net.MalformedURLException;
+import java.net.HttpURLConnection;
 
 public class MainActivity extends Activity
 {
@@ -27,6 +39,7 @@ public class MainActivity extends Activity
     private WebView webView = null;
     private WebChromeClient chromeClient = null;
     private View myView = null;
+    private Handler mHandler = new Handler();
     private WebChromeClient.CustomViewCallback myCallBack = null;
 
     static final String web_url = "http://avdanmu.duapp.com/";
@@ -64,9 +77,11 @@ public class MainActivity extends Activity
         //enable javascript 
         
         webSettings.setJavaScriptEnabled(true);
+        webSettings.setPluginsEnabled(true);
+        webSettings.setDefaultZoom(WebSettings.ZoomDensity.FAR);
         webSettings.setJavaScriptCanOpenWindowsAutomatically(true);
 
-        webView.addJavascriptInterface(new Html5VideoInterface(), "videoInterface");
+        webView.addJavascriptInterface(new Html5VideoInterface(this), "videoInterface");
 
         webView.loadUrl(web_url);
 
@@ -92,7 +107,12 @@ public class MainActivity extends Activity
 
     @Override
     public void onBackPressed() {
-        Log.d("DM", "onBackPressed---canGoBack:"+webView.canGoBack());
+        Log.d("DM", "onBackPressed---canGoBack:"+webView.canGoBack()+ " myView:"+myView);
+        if (myView != null)
+        {
+            chromeClient.onHideCustomView();
+        }
+        
         if(webView == null ){
             super.onBackPressed();
         }
@@ -101,7 +121,7 @@ public class MainActivity extends Activity
             {
                 super.onBackPressed();
             } else {
-                chromeClient.onHideCustomView();
+                
                 webView.goBack();
             }
 
@@ -117,8 +137,31 @@ public class MainActivity extends Activity
     public class MyWebviewClient extends WebViewClient
     {
         @Override
+        public boolean shouldOverrideUrlLoading(WebView view, String url)
+        {
+            Log.d("DM", "shouldOverrideUrlLoading url:"+url);
+            view.loadUrl(url);
+            return true;
+        }
+
+        @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon)
+        {
+            Log.d("DM", "onPageStarted  url:"+url);
+            super.onPageStarted(view, url, favicon);
+        }
+
+        @Override
+        public void onPageFinished(WebView view, String url)
+        {
+            Log.d("DM", "onPageFinished url:" + url );
+            super.onPageFinished(view, url);
+        }
+
+        @Override
         public WebResourceResponse shouldInterceptRequest(WebView view,
                 String url) {
+            Log.d("DM", "shouldInterceptRequest  url:" + url);
             WebResourceResponse response = null;
             response = super.shouldInterceptRequest(view, url);
             return response;
@@ -129,31 +172,49 @@ public class MainActivity extends Activity
         
         @Override
         public void onShowCustomView(View view, CustomViewCallback callback) {
-            Log.d("DM", "onShowCustomView");
+            String name = view.getClass().getName();
+            Log.d("DM", "onShowCustomView--view:"+view+" name:"+ name);
             if(myView != null){
                 callback.onCustomViewHidden();
                 return;
             }
 
+            //videoview.addSubtitleSource();
+
             ViewGroup parent = (ViewGroup) webView.getParent();
             parent.removeView(webView);
             parent.addView(view);
-            myView = view;
+            try {
+                myView = view;
+            } catch (Exception e) {
+                Log.e("DM", "myView error :"+ e);
+                e.printStackTrace();
+            }
+            //myView = view;
 
             myCallBack = callback;
 
-            new Handler().postDelayed(new Runnable() {
+            mHandler.postDelayed(new Runnable() {
                 public void run() 
                 {
                     String js = "javascript: var v=document.getElementsByTagName('video')[0]; "
                         + "v.play(); ";
                     webView.loadUrl(js);
 
-                    js = "javascript: var v=document.getElementsByTagName('video')[0]; "
-                        + "v.addEventListener('playing', function() { window.demo.clickonAndroid(); }, true); ";
-                    webView.loadUrl(js);
+                    //js = "javascript: var v=document.getElementsByTagName('video')[0]; "
+                      //  + "v.addEventListener('playing', function() { window.videoInterface.videoStart(); }, true); ";
+                    //webView.loadUrl(js);
+
                 }
             }, 1);
+
+            String js = "javascript: var v=document.getElementsByTagName('video')[0]; "
+              + "v.addEventListener('playing', function() { window.videoInterface.videoStart(); }, true); ";
+            webView.loadUrl(js);
+
+            js = "javascript: var track = document.getElementsByTagName('track')[0];"
+                + "window.videoInterface.onSubtitleUrl(track.src);";
+            webView.loadUrl(js);
             
         }
         
@@ -185,22 +246,71 @@ public class MainActivity extends Activity
 
     private final class Html5VideoInterface
     {
-        Html5VideoInterface()
+        MainActivity mContext;
+        Html5VideoInterface(Context c)
         {
-
+            mContext = (MainActivity) c;
         }
 
         public void videoStart()
         {
             Log.d("DM", "video interface videoStart");
-            String js = "javascript: var v=document.getElementsByTagName('video')[0]; "
-                + "v.webkitEnterFullscreen(); ";
-            webView.loadUrl(js);
+            mHandler.post( new Runnable() {
+                public void run()
+                {
+                    String js = "javascript: var v=document.getElementsByTagName('video')[0]; "
+                        + "v.webkitEnterFullscreen(); ";
+                    mContext.webView.loadUrl(js);  
+                }
+
+            });
+
         }
 
         public void videoFinish()
         {
             Log.d("DM", "video interface videoFinish");
+        }
+
+        public void onSubtitleUrl(String url)
+        {
+            Log.d("DM", "getSubtitleUrl url:" + url);
+            //InputStream is = getStream(url);
+            //myView.addSubtitleSource(is, 
+             //   MediaFormat.createSubtitleFormat("text/vtt",Locale.ENGLISH.getLanguage()));
+        }
+
+        public void log(String msg)
+        {
+            mHandler.post( new Runnable() {
+                public void run ()
+                {
+                    Log.d("DM", "run ["+msg+ "]");
+                }
+            });
+        }
+
+        private InputStream getStream(String path)
+        {
+            InputStream is = null;
+            URL url = null;
+
+            try {
+                url = new URL(path);
+            } catch (MalformedURLException e) {
+                e.printStackTrace(); 
+            }
+
+            try {
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setDoInput(true);
+                conn.connect();
+                is = conn.getInputStream();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return is;
         }
     }
 
